@@ -1,9 +1,10 @@
 import numpy as np
 import os
-import logging
 import tensorflow as tf
 from tensorflow.python.estimator.export.export import build_raw_serving_input_receiver_fn
 from tensorflow.python.estimator.export.export_output import PredictOutput
+
+tf.logging.set_verbosity(tf.logging.DEBUG)
 
 SIGNATURE_NAME = "serving_default"
 LEARNING_RATE = 0.001
@@ -12,8 +13,6 @@ ITEM_EMBEDDING_TENSOR_NAME = "item_embedding"
 
 def model_fn(features, labels, mode, params):
     embedding_size = 30
-    num_users = len(np.unique(features[USER_EMBEDDING_TENSOR_NAME]))
-    num_items = len(np.unique(features[ITEM_EMBEDDING_TENSOR_NAME]))
 
     user_embedding = tf.keras.layers.Embedding(
         output_dim=embedding_size,
@@ -42,7 +41,15 @@ def model_fn(features, labels, mode, params):
 
         current_item = tf.nn.embedding_lookup(params=item_vecs, ids=item)
 
-        distance = euclidean_distances(current_item, item_vecs)
+        tf.Print(current_item, [current_item], 'tfprint')
+        tf.Print(item_vecs, [item_vecs], 'tfprint')
+        tf.Print(current_item - item_vecs, [current_item - item_vecs], 'tfprint')
+
+
+        distance = tf.norm(current_item - item_vecs, ord='euclidean')
+
+        tf.Print(distance, [distance], 'tfprint')
+
 
         predictions = tf.nn.top_k(distance, 100, sorted=True)
 
@@ -73,6 +80,8 @@ def model_fn(features, labels, mode, params):
     eval_metric_ops = {
         "mse": tf.metrics.mean_squared_error(tf.cast(labels, tf.float32), predictions)
     }
+
+    # import pdb; pdb.set_trace()
 
     # Provide an estimator spec for `ModeKeys.EVAL` and `ModeKeys.TRAIN` modes.
     return tf.estimator.EstimatorSpec(
@@ -106,12 +115,18 @@ def _input_fn(training_dir, training_filename):
         features_dtype=np.int
     )
 
+
+
+    print(training_set.data)
+
     return tf.estimator.inputs.numpy_input_fn(
         x={
             USER_EMBEDDING_TENSOR_NAME: np.array(training_set.data[:, 0]),
             ITEM_EMBEDDING_TENSOR_NAME: np.array(training_set.data[:, 1])
         },
-        y=np.array(training_set.data[:, 2]),
+
+
+        y=training_set.target,
         shuffle=True,
         batch_size=64,
         num_epochs=None

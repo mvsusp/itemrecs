@@ -1,24 +1,19 @@
-import logging
-import sys
-import os
-
-import boto3
-import botocore
+import numpy as np
+import tensorflow as tf
 import sagemaker
 from sagemaker.tensorflow import TensorFlow
 
-import sagemaker
-import tensorflow as tf
-import numpy as np
-
-
 tf_estimator = TensorFlow(entry_point='itemembd.py', role='SageMakerRole',
-                          training_steps=10, evaluation_steps=None,
-                          train_instance_count=1, train_instance_type='ml.p2.xlarge')
+                          training_steps=1, evaluation_steps=1,
+                          train_instance_count=1, train_instance_type='local')
 
-tf_estimator.fit('s3://bucket/path/to/training/data')
+sagemaker_session = sagemaker.Session()
 
-predictor = tf_estimator.deploy()
+inputs = sagemaker_session.upload_data(path='.', key_prefix='itemrecs')
+
+tf_estimator.fit(inputs)
+
+predictor = tf_estimator.deploy(initial_instance_count=1, instance_type='local')
 
 user = tf.make_tensor_proto(values=np.asarray([10]), shape=[1], dtype=tf.float64)
 item = tf.make_tensor_proto(values=np.asarray([10]), shape=[1], dtype=tf.float64)
